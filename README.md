@@ -1,4 +1,3 @@
-```markdown
 # Pit Strategy Win/Loss Analyzer: Full-Stack F1 Analytics Engine
 
 ## 1. Project Overview
@@ -66,4 +65,3 @@ The system is designed to validate several key strategic hypotheses:
 * **H1**: Comparison of pit reaction latency between top-tier teams (e.g., Red Bull vs. Ferrari).
 * **H2**: Analysis of how street circuit dynamics punish late strategic calls.
 * **H3**: Correlation between high Undercut Threat Scores and net position loss.
-```
