@@ -1,2 +1,25 @@
 # Ignore FastF1 data and cache
 notebooks/data/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# FastF1 Data (Crucial: do not commit local cache)
+pipeline/.fastf1_cache/
+*.pkl
+
+# Databases
+postgres_data/
+
+# OS/IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Node/Frontend
+frontend/node_modules/
+frontend/dist/
