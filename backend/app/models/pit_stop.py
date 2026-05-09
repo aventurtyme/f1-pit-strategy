@@ -27,3 +27,8 @@ class PitStop(Base):
     race_flag = Column(String)     # 'green', 'sc', 'vsc', 'red'
     pit_loss_used = Column(Float)  # The actual loss value used in PTL math
     is_opportunistic = Column(Boolean, default=False)
+
+    __table_args__ = (
+        UniqueConstraint('session_id', 'driver_code', 'lap',
+                         name='uq_pit_stop_session_driver_lap'),
+    )
