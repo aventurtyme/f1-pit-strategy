@@ -1,9 +1,20 @@
+# API
 fastapi==0.110.0
 uvicorn[standard]==0.27.1
+
+# Database
 sqlalchemy==2.0.27
-asyncpg==0.29.0
+pg8000==1.31.2
 alembic==1.13.1
-pydantic==2.6.3
+
+# Validation
+pydantic==2.7.1
 pydantic-settings==2.2.1
+
+# Environment
 python-dotenv==1.0.1
-psycopg2-binary==2.9.9
+
+# Data pipeline (for later)
+pandas==2.2.1
+numpy==1.26.4
+fastf1==3.3.9

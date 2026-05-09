@@ -1,67 +1,231 @@
-# Pit Strategy Win/Loss Analyzer: Full-Stack F1 Analytics Engine
+# Pit Strategy Win/Loss Analyzer
 
-## 1. Project Overview
-The Pit Strategy Win/Loss Analyzer is a full-stack data application designed to retroactively evaluate the efficacy of pit stop decisions across multiple Formula 1 seasons. The system utilizes a proprietary metric, the Undercut Threat Score (UTS), to determine if pitting was the optimal choice at a specific lap based only on the data available to the team at that moment.
+A full-stack data analytics application that retroactively evaluates every pit stop decision across one or more Formula 1 seasons. The system answers a single, precise question for each stop:
 
-This project serves as a demonstration of both analytical depth—specifically in metric definition and back-testing—and full-stack engineering competence including data pipelining, REST API design, and containerized database management.
+> *"At lap X, with only the data available to the team at that moment, was pitting the right call?"*
 
-## 2. Core Methodology: The Undercut Threat Score (UTS)
-The UTS quantifies the risk of an undercut at the moment of pitting and evaluates whether the stop successfully resolved that risk. The score is derived from two primary sub-components:
+---
 
-### 2.1 Pre-Pit Threat Level (PTL)
-The PTL measures imminent risk from the car behind using real-time timing data, tire age, and compound-specific decay rates. 
-* **Formula**: $PTL = \text{pit\_loss\_estimate} - \text{gap\_behind} - (\text{tire\_age\_behind} \times \text{compound\_decay\_rate})$.
-* **Interpretation**: A positive PTL indicates a high threat environment where the pitting car was vulnerable to an undercut.
+## Table of Contents
 
-### 2.2 Post-Pit Position Delta (PPD)
-The PPD measures the immediate outcome of the stop by calculating the difference in track position before and after the pit sequence.
+- [Overview](#overview)
+- [Core Metric: Undercut Threat Score](#core-metric-undercut-threat-score)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Quickstart](#quickstart)
+- [Development Status](#development-status)
+- [Portfolio Findings](#portfolio-findings)
 
-### 2.3 Final UTS Normalization
-The final UTS combines these factors into a normalized scale of -100 to +100.
-* **UTS > 0**: The stop was strategically correct based on threat and outcome.
-* **UTS < 0**: The stop was suboptimal (e.g., too early, too late, or unnecessary).
+---
 
-## 3. Technology Stack
-* **Data Engineering**: Python 3.11, FastF1 API, Pandas, NumPy.
-* **Backend**: FastAPI (Asynchronous Python), SQLAlchemy ORM.
-* **Database**: PostgreSQL 16 managed via Docker.
-* **Frontend**: React 18, Vite, Tailwind CSS, Recharts, D3.js.
-* **Orchestration**: Docker Compose.
+## Overview
 
-## 4. Project Structure
-The repository is organized to separate research and development from production-ready code:
+The Pit Strategy Win/Loss Analyzer computes a proprietary metric — the **Undercut Threat Score (UTS)** — for every pit stop across a configurable range of F1 seasons. Results are stored in a local PostgreSQL database and surfaced through a FastAPI backend and interactive React frontend.
 
-```text
-pit-strategy-analyzer/
-├── backend/                # FastAPI application and REST endpoints
-│   ├── app/
-│   │   ├── api/            # Route handlers
-│   │   ├── models/         # SQLAlchemy database models
-│   │   ├── schemas/        # Pydantic validation models
-│   │   └── main.py         # Application entry point
-├── frontend/               # React/Vite web application
-│   ├── src/
-│   │   ├── components/     # D3 race timeline and UI components
-│   │   ├── api/            # React Query fetching logic
-│   │   └── views/          # Dashboard and analysis pages
-├── notebooks/              # Research, EDA, and Phase 1-4 analysis
-├── pipeline/               # Offline ingestion and UTS computation engine
-│   ├── scripts/            # CLI tools for season processing
-│   └── core/               # Shared logic for UTS math and classification
-├── sql/                    # Database management
-│   ├── migrations/         # Alembic schema versioning
-│   └── seeds/              # Reference data (Circuit loss, tire decay)
-├── docker-compose.yml      # Multi-container orchestration
-└── .env                    # Environment configuration
+The project demonstrates both analytical depth (metric definition, empirical validation, statistical modelling) and full-stack engineering competence (data pipeline, REST API design, containerised database, React UI).
+
+---
+
+## Core Metric: Undercut Threat Score
+
+The UTS quantifies whether a car was at risk of being undercut at the moment it pitted, and whether pitting resolved or created that risk. It is computed independently for each pit stop using only data available to the team at that lap — no post-pit information is used in the score.
+
+### Pre-Pit Threat Level (PTL)
+
+Measures the imminence of an undercut threat from the car behind:
+
+```
+PTL = pit_loss_estimate − gap_behind − (tire_age_behind × compound_decay_rate)
 ```
 
-## 5. Development Status: Phase 2
-This project is currently transitioning from Phase 1 (Analytical R&D) to Phase 2 (Data Pipeline & Database Construction). 
-* **Completed**: UTS formula validation, statistical significance testing, and regression modeling via Jupyter Notebooks.
-* **In Progress**: Development of the automated Python ingestion pipeline and PostgreSQL schema implementation.
+A positive PTL indicates the car behind could have undercut the pitting car within the next lap. PTL ≤ 0 means no imminent threat existed.
 
-## 6. Planned Portfolio Findings
-The system is designed to validate several key strategic hypotheses:
-* **H1**: Comparison of pit reaction latency between top-tier teams (e.g., Red Bull vs. Ferrari).
-* **H2**: Analysis of how street circuit dynamics punish late strategic calls.
-* **H3**: Correlation between high Undercut Threat Scores and net position loss.
+### Post-Pit Position Delta (PPD)
+
+Measures the immediate outcome of the stop:
+
+```
+PPD = position_after_pit_exit − position_before_pit_entry
+```
+
+Negative PPD = positions gained. Positive PPD = positions lost.
+
+### Final UTS
+
+PTL and PPD are combined and normalised to a −100 to +100 scale:
+
+| Score | Interpretation |
+|-------|---------------|
+| UTS > 0 | Stop was the correct call — threat was real and/or outcome was positive |
+| UTS = 0 | Neutral — neither clearly correct nor clearly wrong |
+| UTS < 0 | Stop was suboptimal — too early, too late, or unnecessary |
+
+### Compound Decay Rates
+
+Default per-lap degradation constants (seconds/lap), validated against 2024 empirical data:
+
+| Compound | Decay Rate |
+|----------|-----------|
+| Soft | 0.08 |
+| Medium | 0.045 |
+| Hard | 0.02 |
+| Intermediate | 0.03 |
+| Wet | 0.015 |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Data ingestion | Python 3.11, FastF1 |
+| Data processing | Pandas, NumPy |
+| Backend API | FastAPI, SQLAlchemy 2.0 |
+| Database | PostgreSQL 16 (Docker) |
+| Migrations | Alembic |
+| Frontend | React 18, Vite, Tailwind CSS |
+| Visualisation | Recharts, D3.js |
+| Orchestration | Docker Compose |
+
+---
+
+## Project Structure
+
+```
+pit-strategy-analyzer/
+├── backend/                    # FastAPI application
+│   └── app/
+│       ├── api/                # Route handlers
+│       ├── core/               # Database engine and config
+│       ├── models/             # SQLAlchemy ORM models
+│       └── schemas/            # Pydantic validation schemas
+├── frontend/                   # React/Vite application
+│   └── src/
+│       ├── components/         # D3 race timeline and UI components
+│       ├── api/                # React Query data fetching
+│       └── views/              # Dashboard and analysis pages
+├── notebooks/                  # EDA and metric validation (Phases 1–4)
+├── pipeline/                   # Offline UTS computation engine
+│   ├── scripts/                # CLI tools for season processing
+│   └── core/                   # UTS math, PTL, classification logic
+├── sql/
+│   ├── migrations/             # Alembic versioned migrations
+│   └── seeds/                  # Circuit config and decay rate reference data
+├── docker-compose.yml
+├── .env.example                # Environment variable template
+└── README.md
+```
+
+---
+
+## Quickstart
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- Python 3.11+
+- Node.js 18+
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/your-username/pit-strategy-analyzer.git
+cd pit-strategy-analyzer
+cp .env.example .env        # fill in your values
+```
+
+### 2. Start the database
+
+```bash
+docker compose up -d
+docker ps                   # confirm STATUS shows (healthy)
+```
+
+### 3. Set up Python environment
+
+```bash
+python -m venv venv
+source venv/bin/activate    # Windows: venv\Scripts\activate
+pip install -r backend/requirements.txt
+```
+
+### 4. Run database migrations
+
+```bash
+alembic upgrade head
+```
+
+### 5. Seed reference data and run the pipeline
+
+```bash
+# Seed circuit config and compound decay constants
+python pipeline/scripts/seed.py
+
+# Ingest and compute UTS for the 2024 season
+python pipeline/scripts/run_season.py --season 2024
+```
+
+### 6. Start the API
+
+```bash
+uvicorn backend.app.main:app --reload
+```
+
+### 7. Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The app will be available at `http://localhost:5173`.
+
+---
+
+## Development Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Data audit and FastF1 integration | Complete |
+| 2 | Full season EDA and metric validation | Complete |
+| 3 | UTS formula calibration and sensitivity analysis | Complete |
+| 4 | Statistical modelling and insight extraction | Complete |
+| 5 | PostgreSQL schema and Alembic migrations | Complete |
+| 6 | Ingestion pipeline and UTS computation engine | In progress |
+| 7 | FastAPI backend and REST endpoints | Planned |
+| 8 | React frontend — race timeline and dashboards | Planned |
+
+---
+
+## Portfolio Findings
+
+The following hypotheses are validated against 2024 season data. Full methodology and results are documented in [`notebooks/04_modelling.ipynb`](notebooks/04_modelling.ipynb).
+
+**H1 — Pit reaction latency:** Comparison of median Pit Lag Index between top-tier teams, tested for statistical significance via Mann-Whitney U.
+
+**H2 — Street circuit punishment:** Street circuits (Monaco, Baku, Singapore) generate disproportionately high rates of negative-UTS stops due to compressed track position dynamics.
+
+**H3 — Multi-stop proactivity:** Drivers on two-stop strategies have measurably lower reactive stop rates than one-stop drivers.
+
+**H4 — Season-on-season improvement:** UTS trends across 2023–2024 reveal strategic learning patterns in at least two teams.
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and populate:
+
+```dotenv
+DB_USER=f1_admin
+DB_PASSWORD=your_password
+DB_NAME=pit_analyzer_db
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DATABASE_URL=postgresql+pg8000://f1_admin:your_password@127.0.0.1:5432/pit_analyzer_db
+FASTF1_CACHE_DIR=./pipeline/.fastf1_cache
+```
+
+---
+
+*Portfolio project — not affiliated with Formula 1, FIA, or any F1 team.*
