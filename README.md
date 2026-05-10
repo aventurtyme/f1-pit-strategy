@@ -185,16 +185,24 @@ The app will be available at `http://localhost:5173`.
 
 ## Development Status
 
+### Analytics (Pre-Build)
+
+| Phase | Notebook | Description | Status |
+|-------|----------|-------------|--------|
+| 1 | `01_data_audit.ipynb` | FastF1 data quality & availability audit — session loading, gap data tiers, SC lap identification, tire stint validation | Complete |
+| 2 | `02_eda.ipynb` | Full 2024 season EDA — pit stop landscape, gap/tire age distributions, empirical decay rate fitting, pit loss validation, PPD analysis, hypothesis visual checks | Complete |
+| 3 | `03_metric_validation.ipynb` | UTS implementation, sanity-check races, edge case testing, distribution analysis, sensitivity analysis across decay rates / pit loss / weights | Complete |
+| 4 | `04_modelling.ipynb` | Pit Lag Index, team/circuit statistical analysis, driver archetype classification, OLS regression, plain-English findings | Complete |
+
+### Build
+
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1 | Data audit and FastF1 integration | Complete |
-| 2 | Full season EDA and metric validation | Complete |
-| 3 | UTS formula calibration and sensitivity analysis | Complete |
-| 4 | Statistical modelling and insight extraction | Complete |
-| 5 | PostgreSQL schema and Alembic migrations | Complete |
-| 6 | Ingestion pipeline and UTS computation engine | In progress |
-| 7 | FastAPI backend and REST endpoints | Planned |
-| 8 | React frontend — race timeline and dashboards | Planned |
+| 5 | PostgreSQL schema, Alembic migrations, Docker Compose setup, reference data seeding (`circuit_config`, `compound_decay_config`) | Complete |
+| 6 | Ingestion pipeline (`run_season.py`), UTS computation engine, SC stop flagging, gap interpolation, strategy classification, SQL aggregate views | Complete |
+| 7 | FastAPI backend — all 8 REST endpoints, Pydantic schemas, error handling, CORS | Up next |
+| 8 | React frontend — race timeline view, pit stop tooltips, team dashboard, circuit analysis | Planned |
+| 9 | Insights panel, 2023 back-fill, portfolio polish, README demo recording | Planned |
 
 ---
 
