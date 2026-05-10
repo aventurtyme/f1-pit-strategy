@@ -200,8 +200,8 @@ The app will be available at `http://localhost:5173`.
 |-------|-------------|--------|
 | 5 | PostgreSQL schema, Alembic migrations, Docker Compose setup, reference data seeding (`circuit_config`, `compound_decay_config`) | Complete |
 | 6 | Ingestion pipeline (`run_season.py`), UTS computation engine, SC stop flagging, gap interpolation, strategy classification, SQL aggregate views | Complete |
-| 7 | FastAPI backend — all 8 REST endpoints, Pydantic schemas, error handling, CORS | Up next |
-| 8 | React frontend — race timeline view, pit stop tooltips, team dashboard, circuit analysis | Planned |
+| 7 | FastAPI backend — all 8 REST endpoints, Pydantic schemas, error handling, CORS | Complete |
+| 8 | React frontend — race timeline view, pit stop tooltips, team dashboard, circuit analysis | In Progress |
 | 9 | Insights panel, 2023 back-fill, portfolio polish, README demo recording | Planned |
 
 ---
