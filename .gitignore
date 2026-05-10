@@ -6,6 +6,11 @@ data/
 # Environment
 .env
 .env.*
+*.pem
+*.key
+.env.local
+.env.development
+.env.production
 
 # Python
 __pycache__/
@@ -19,6 +24,11 @@ venv/
 *.egg-info/
 dist/
 build/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
 
 # FastF1 cache — large binary files, never commit
 pipeline/.fastf1_cache/
@@ -53,3 +63,15 @@ logs/
 node_modules/
 dist/
 frontend/.env
+
+# Alembic
+alembic/versions/*.pyc
+
+# Frontend (Vite-specific, beyond node_modules)
+frontend/dist/
+frontend/.env.local
+frontend/.env.production
+.eslintcache
+
+# OS
+Thumbs.db

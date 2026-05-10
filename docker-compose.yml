@@ -19,5 +19,21 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build: ./backend
+    container_name: f1_strategy_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy   # wait for pg_isready before starting
+    environment:
+      DATABASE_URL: postgresql+pg8000://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT:-5432}/${DB_NAME}
+      DATABASE_ECHO: ${DATABASE_ECHO:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app   # hot-reload: code changes apply without rebuild
+
 volumes:
   postgres_data:
