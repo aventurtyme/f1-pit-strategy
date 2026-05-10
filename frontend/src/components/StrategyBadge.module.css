@@ -1,0 +1,28 @@
+.badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.proactive {
+  background: #1a2e1a;
+  color: var(--uts-pos-text);
+  border: 1px solid #2d5a2d;
+}
+
+.reactive {
+  background: #2e1a1a;
+  color: var(--uts-neg-text);
+  border: 1px solid #5a2d2d;
+}
+
+.neutral {
+  background: #222222;
+  color: var(--text-secondary);
+  border: 1px solid var(--bg-border-strong);
+}

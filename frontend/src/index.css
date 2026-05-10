@@ -1,0 +1,100 @@
+/* ─────────────────────────────────────────────────────────
+   Pit Strategy Analyzer — Global Styles
+   Source of truth: style-guide.html v1.0
+   All colour values must be referenced via CSS variables.
+   No hardcoded hex values outside this file.
+───────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* ── Base surfaces ── */
+  --bg-base:          #0a0a0a;
+  --bg-surface:       #111111;
+  --bg-elevated:      #1a1a1a;
+  --bg-border:        #242424;
+  --bg-border-strong: #333333;
+
+  /* ── Text ramp ── */
+  --text-primary:   #f0ede8;
+  --text-secondary: #a8a49e;
+  --text-tertiary:  #6a6764;
+  --text-disabled:  #3a3835;
+
+  /* ── UI accent (chrome only — not UTS) ── */
+  --accent:     #c8c4be;
+  --accent-dim: #2a2825;
+
+  /* ── UTS semantic — scoped exclusively to score contexts ── */
+  --uts-pos-bg-hi:  #1a4a2e;
+  --uts-pos-bg-mid: #1e6b3a;
+  --uts-pos-text:   #6fcf8f;
+  --uts-neg-bg-hi:  #4a1a1a;
+  --uts-neg-bg-mid: #6b1e1e;
+  --uts-neg-text:   #cf6f6f;
+  --uts-neu-bg:     #222222;
+  --uts-neu-text:   #a8a49e;
+
+  /* ── Typography ── */
+  --font-display: 'Syne', sans-serif;
+  --font-mono:    'DM Mono', monospace;
+
+  /* ── Radii ── */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+
+  /* ── Nav ── */
+  --nav-height: 44px;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 13px;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+  /* Minimum supported viewport: 1280px per style guide */
+  min-width: 1280px;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ── Focus rings ── */
+:focus-visible {
+  outline: 1px solid var(--bg-border-strong);
+  outline-offset: 1px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--bg-border-strong); border-radius: 3px; }
+
+/* ── Utility classes ── */
+.label-micro {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

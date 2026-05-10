@@ -1,0 +1,77 @@
+.nav {
+  height: var(--nav-height);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--bg-border);
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  gap: 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  /* Prevent nav from shrinking below minimum viewport */
+  min-width: 1280px;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.links {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+.link {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  transition: color 150ms ease-out;
+}
+
+.link:hover {
+  color: var(--text-secondary);
+}
+
+.link.active {
+  color: var(--text-primary);
+}
+
+.selectors {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.select {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--bg-border-strong);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 150ms ease-out;
+}
+
+.select:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

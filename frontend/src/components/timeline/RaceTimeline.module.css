@@ -1,0 +1,54 @@
+.wrapper {
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem 1.5rem 1rem;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.svg {
+  display: block;
+  overflow: visible;
+}
+
+/* Marker hover: scale 1.4× per style guide §06 */
+.svg :global(.pit-marker:hover) {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(1.4);
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  gap: 1.25rem;
+  margin-top: 1rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--bg-border);
+  padding-left: 48px; /* align with track start (= MARGIN.left) */
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bg-base);
+  border: 1.5px solid transparent;
+  flex-shrink: 0;
+}
+
+.dotPos { border-color: var(--uts-pos-text); }
+.dotNeg { border-color: var(--uts-neg-text); }
+.dotNeu { border-color: var(--text-tertiary); }
