@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────
 // components/NavBar.tsx
-// Fixed top nav: brand + route links + season/race selectors.
-// Season and race selection is owned by Zustand + URL params;
-// the NavBar renders what the store has and dispatches updates.
+// Season dropdown uses `s.season` as value.
+// Race dropdown uses `r.id` as session_id (not session_id field —
+// the backend Race schema uses `id` as the primary key).
 // ─────────────────────────────────────────────────────────
 
 import { NavLink, useSearchParams } from 'react-router-dom'
@@ -13,7 +13,6 @@ import styles from './NavBar.module.css'
 
 export default function NavBar() {
   const [searchParams, setSearchParams] = useSearchParams()
-
   const { selectedSeason, selectedSessionId, setSeason, setSessionId } = useUiStore()
 
   const { data: seasons } = useSeasons()
@@ -23,13 +22,8 @@ export default function NavBar() {
   useEffect(() => {
     const urlSeason    = searchParams.get('season')
     const urlSessionId = searchParams.get('session')
-
-    if (urlSeason && !selectedSeason) {
-      setSeason(Number(urlSeason))
-    }
-    if (urlSessionId && !selectedSessionId) {
-      setSessionId(urlSessionId)
-    }
+    if (urlSeason && !selectedSeason)    setSeason(Number(urlSeason))
+    if (urlSessionId && !selectedSessionId) setSessionId(urlSessionId)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -41,60 +35,32 @@ export default function NavBar() {
     setSearchParams(next, { replace: true })
   }, [selectedSeason, selectedSessionId, setSearchParams])
 
-  function handleSeasonChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const val = e.target.value
-    setSeason(val ? Number(val) : null)
-  }
-
-  function handleRaceChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const val = e.target.value
-    setSessionId(val || null)
-  }
-
   return (
     <nav className={styles.nav} aria-label="Main navigation">
       <span className={styles.brand}>Pit Analyzer</span>
 
       <div className={styles.links}>
-        <NavLink
-          to="/"
-          className={({ isActive }) =>
-            `${styles.link} ${isActive ? styles.active : ''}`
-          }
-        >
-          Timeline
-        </NavLink>
-        <NavLink
-          to="/teams"
-          className={({ isActive }) =>
-            `${styles.link} ${isActive ? styles.active : ''}`
-          }
-        >
-          Teams
-        </NavLink>
-        <NavLink
-          to="/circuits"
-          className={({ isActive }) =>
-            `${styles.link} ${isActive ? styles.active : ''}`
-          }
-        >
-          Circuits
-        </NavLink>
-        <NavLink
-          to="/insights"
-          className={({ isActive }) =>
-            `${styles.link} ${isActive ? styles.active : ''}`
-          }
-        >
-          Insights
-        </NavLink>
+        {['/', '/teams', '/circuits', '/insights'].map((path, i) => {
+          const labels = ['Timeline', 'Teams', 'Circuits', 'Insights']
+          return (
+            <NavLink
+              key={path}
+              to={path}
+              className={({ isActive }) =>
+                `${styles.link} ${isActive ? styles.active : ''}`
+              }
+            >
+              {labels[i]}
+            </NavLink>
+          )
+        })}
       </div>
 
       <div className={styles.selectors}>
         <select
           className={styles.select}
           value={selectedSeason ?? ''}
-          onChange={handleSeasonChange}
+          onChange={(e) => setSeason(e.target.value ? Number(e.target.value) : null)}
           aria-label="Select season"
         >
           <option value="" disabled>Season</option>
@@ -108,15 +74,16 @@ export default function NavBar() {
         <select
           className={styles.select}
           value={selectedSessionId ?? ''}
-          onChange={handleRaceChange}
+          onChange={(e) => setSessionId(e.target.value || null)}
           disabled={!races?.length}
           aria-label="Select race"
         >
           <option value="" disabled>
             {selectedSeason ? 'Select race' : '— select season first —'}
           </option>
+          {/* Backend Race uses `id` as the uuid primary key */}
           {races?.map((r) => (
-            <option key={r.session_id} value={r.session_id}>
+            <option key={r.id} value={r.id}>
               Rd {String(r.round).padStart(2, '0')} — {r.circuit_name}
             </option>
           ))}

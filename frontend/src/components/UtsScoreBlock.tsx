@@ -1,24 +1,26 @@
 // ─────────────────────────────────────────────────────────
 // components/UtsScoreBlock.tsx
 // UTS score display with semantic background + badge.
-// PTL and PPD are always rendered with explicit +/− sign.
-// font-variant-numeric: tabular-nums on all numbers.
+// Uses PitStopDetail (the full /pit-stops response shape).
+// PTL and PPD rendered with explicit +/− sign.
 // ─────────────────────────────────────────────────────────
 
-import type { PitStop } from '../api/types'
+import type { PitStopDetail } from '../api/types'
 import StrategyBadge from './StrategyBadge'
 import styles from './UtsScoreBlock.module.css'
 
 interface Props {
-  pitStop: PitStop
+  pitStop: PitStopDetail
 }
 
-function signedVal(n: number, decimals = 1): string {
+function signedVal(n: number | null, decimals = 1): string {
+  if (n == null) return '—'
   const fixed = Math.abs(n).toFixed(decimals)
   return n >= 0 ? `+${fixed}` : `−${fixed}`
 }
 
-function utsClass(uts: number): string {
+function utsClass(uts: number | null): string {
+  if (uts == null) return styles.neu
   if (uts > 0) return styles.pos
   if (uts < 0) return styles.neg
   return styles.neu
@@ -42,7 +44,12 @@ export default function UtsScoreBlock({ pitStop }: Props) {
         <span className="tabular-nums">PTL: {signedVal(ptl)}s</span>
         <br />
         <span className="tabular-nums">
-          PPD: {ppd === 0 ? '0 pos' : `${ppd > 0 ? '+' : '−'}${Math.abs(ppd)} pos`}
+          PPD:{' '}
+          {ppd == null
+            ? '—'
+            : ppd === 0
+            ? '0 pos'
+            : `${ppd > 0 ? '+' : '−'}${Math.abs(ppd)} pos`}
         </span>
       </div>
     </div>

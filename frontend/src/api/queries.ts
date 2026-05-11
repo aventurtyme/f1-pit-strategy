@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────
 // api/queries.ts
 // React Query (v3) query keys + fetcher functions.
-// One fetcher per endpoint — no business logic here.
+// Endpoint paths match the backend routers exactly.
 // ─────────────────────────────────────────────────────────
 
 import { useQuery } from 'react-query'
@@ -9,18 +9,18 @@ import client from './client'
 import type {
   Season,
   Race,
-  PitStopsResponse,
-  TimelineResponse,
+  PitStopDetail,
+  RaceTimeline,
 } from './types'
 
-// ── Query keys (tuple arrays for granular invalidation) ──
+// ── Query keys ────────────────────────────────────────────
 
 export const queryKeys = {
-  seasons:     ['seasons'] as const,
-  races:       (season: number) => ['races', season] as const,
-  pitStops:    (sessionId: string) => ['pit-stops', sessionId] as const,
-  timeline:    (sessionId: string) => ['timeline', sessionId] as const,
-} as const
+  seasons:  ['seasons'] as const,
+  races:    (season: number)    => ['races', season] as const,
+  pitStops: (sessionId: string) => ['pit-stops', sessionId] as const,
+  timeline: (sessionId: string) => ['timeline', sessionId] as const,
+}
 
 // ── Fetchers ─────────────────────────────────────────────
 
@@ -34,23 +34,26 @@ async function fetchRaces(season: number): Promise<Race[]> {
   return data
 }
 
-async function fetchPitStops(sessionId: string): Promise<PitStopsResponse> {
-  const { data } = await client.get<PitStopsResponse>(`/races/${sessionId}/pit-stops`)
+async function fetchPitStops(sessionId: string): Promise<PitStopDetail[]> {
+  // exclude_sc=false so we get everything; TimelineView filters for display
+  const { data } = await client.get<PitStopDetail[]>(
+    `/races/${sessionId}/pit-stops?exclude_sc=false`
+  )
   return data
 }
 
-async function fetchTimeline(sessionId: string): Promise<TimelineResponse> {
-  const { data } = await client.get<TimelineResponse>(`/races/${sessionId}/timeline`)
+async function fetchTimeline(sessionId: string): Promise<RaceTimeline> {
+  const { data } = await client.get<RaceTimeline>(`/races/${sessionId}/timeline`)
   return data
 }
 
-// ── Hooks ────────────────────────────────────────────────
+// ── Hooks ─────────────────────────────────────────────────
 
 export function useSeasons() {
   return useQuery({
     queryKey: queryKeys.seasons,
     queryFn: fetchSeasons,
-    staleTime: Infinity, // seasons list rarely changes mid-session
+    staleTime: Infinity,
   })
 }
 
