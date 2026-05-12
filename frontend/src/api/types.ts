@@ -116,3 +116,41 @@ export interface DriverRow {
   team: string
   pit_stops: MergedPitStop[]
 }
+
+// ── Team profile ──────────────────────────────────────
+export interface TeamRaceUts {
+  session_id: string;
+  circuit_name: string;
+  round: number;
+  avg_uts: number;
+  stop_count: number;
+}
+
+export interface TeamStrategyProfile {
+  team: string;
+  season: number;
+  avg_uts: number;
+  reactive_stop_rate: number;    // 0–1
+  proactive_stop_rate: number;
+  neutral_stop_rate: number;
+  pit_lag_index: number;         // median laps late
+  stops_analysed: number;
+  race_uts: TeamRaceUts[];       // per-race breakdown for bar chart
+  best_stops: PitStopDetail[];         // top 3 by UTS
+  worst_stops: PitStopDetail[];        // bottom 3 by UTS
+}
+
+// ── Circuit analysis ──────────────────────────────────
+export interface CircuitAnalysis {
+  circuit_key: string;
+  circuit_name: string;
+  circuit_type: 'street' | 'permanent' | 'hybrid';
+  pit_loss_estimate: number;
+  avg_gap_behind: number;
+  avg_uts: number;
+  negative_uts_rate: number;     // 0–1
+  late_call_position_correlation: number;   // −1 to +1
+  circuit_punishment_score: number;
+  uts_distribution: { bucket: string; count: number }[];
+  stops_analysed: number;
+}

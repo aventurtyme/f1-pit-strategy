@@ -6,6 +6,9 @@
 // ─────────────────────────────────────────────────────────
 
 import { Routes, Route } from 'react-router-dom'
+import { TeamView }    from './views/TeamView'
+import { CircuitView } from './views/CircuitView'
+import { InsightsPanel } from './components/insights/InsightsPanel'
 import NavBar from './components/NavBar'
 import TimelineView from './views/TimelineView'
 import NotFound from './views/NotFound'
@@ -26,11 +29,11 @@ export default function App() {
       <NavBar />
       <main className={styles.main}>
         <Routes>
-          <Route path="/"          element={<TimelineView />} />
-          <Route path="/teams"     element={<ComingSoon name="Teams" />} />
-          <Route path="/circuits"  element={<ComingSoon name="Circuits" />} />
-          <Route path="/insights"  element={<ComingSoon name="Insights" />} />
-          <Route path="*"          element={<NotFound />} />
+          <Route path="/"                      element={<TimelineView />} />
+          <Route path="/teams/:team"           element={<TeamView />} />
+          <Route path="/circuits/:circuitKey"  element={<CircuitView />} />
+          <Route path="/insights"              element={<InsightsPanel />} />
+          <Route path="*"                      element={<NotFound />} />
         </Routes>
       </main>
     </div>
