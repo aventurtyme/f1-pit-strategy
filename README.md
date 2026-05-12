@@ -22,7 +22,7 @@ A full-stack data analytics application that retroactively evaluates every pit s
 
 The Pit Strategy Win/Loss Analyzer computes a proprietary metric — the **Undercut Threat Score (UTS)** — for every pit stop across a configurable range of F1 seasons. Results are stored in a local PostgreSQL database and surfaced through a FastAPI backend and interactive React frontend.
 
-The project demonstrates both analytical depth (metric definition, empirical validation, statistical modelling) and full-stack engineering competence (data pipeline, REST API design, containerised database, React UI).
+The project demonstrates both analytical depth (metric definition, empirical validation, statistical modelling) and full-stack engineering competence (data pipeline, REST API design, containerised database, React UI, and AI-powered insight synthesis).
 
 ---
 
@@ -83,8 +83,10 @@ Default per-lap degradation constants (seconds/lap), validated against 2024 empi
 | Backend API | FastAPI, SQLAlchemy 2.0 |
 | Database | PostgreSQL 16 (Docker) |
 | Migrations | Alembic |
-| Frontend | React 18, Vite, Tailwind CSS |
+| Frontend | React 18, Vite, TypeScript |
 | Visualisation | Recharts, D3.js |
+| State management | React Query v3, Zustand |
+| AI synthesis | Gemini API |
 | Orchestration | Docker Compose |
 
 ---
@@ -101,9 +103,14 @@ pit-strategy-analyzer/
 │       └── schemas/            # Pydantic validation schemas
 ├── frontend/                   # React/Vite application
 │   └── src/
-│       ├── components/         # D3 race timeline and UI components
-│       ├── api/                # React Query data fetching
-│       └── views/              # Dashboard and analysis pages
+│       ├── api/                # React Query hooks and type definitions
+│       ├── components/         # Shared UI components
+│       │   ├── cards/          # StopCard
+│       │   ├── charts/         # UtsBarChart, StopRatioBar, UtsDistribution
+│       │   ├── insights/       # InsightsPanel (static + AI narrative)
+│       │   └── timeline/       # RaceTimeline, PitStopTooltip
+│       ├── store/              # Zustand UI state
+│       └── views/              # Page-level components
 ├── notebooks/                  # EDA and metric validation (Phases 1–4)
 ├── pipeline/                   # Offline UTS computation engine
 │   ├── scripts/                # CLI tools for season processing
@@ -134,44 +141,30 @@ cd pit-strategy-analyzer
 cp .env.example .env        # fill in your values
 ```
 
-### 2. Start the database
+### 2. Start the database and API
 
 ```bash
 docker compose up -d
-docker ps                   # confirm STATUS shows (healthy)
+docker ps                   # confirm both db and api containers show (healthy)
 ```
 
-### 3. Set up Python environment
+### 3. Run the pipeline (first time only)
+
+With your venv active:
 
 ```bash
 python -m venv venv
 source venv/bin/activate    # Windows: venv\Scripts\activate
 pip install -r backend/requirements.txt
-```
 
-### 4. Run database migrations
-
-```bash
 alembic upgrade head
-```
-
-### 5. Seed reference data and run the pipeline
-
-```bash
-# Seed circuit config and compound decay constants
 python pipeline/scripts/seed.py
-
-# Ingest and compute UTS for the 2024 season
 python pipeline/scripts/run_season.py --season 2024
 ```
 
-### 6. Start the API
+The pipeline downloads and caches all 24 race sessions via FastF1 on first run (~30–60 min). Subsequent runs are instant from cache.
 
-```bash
-uvicorn backend.app.main:app --reload
-```
-
-### 7. Start the frontend
+### 4. Start the frontend
 
 ```bash
 cd frontend
@@ -179,7 +172,14 @@ npm install
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`.
+The app will be available at `http://localhost:5173`. The API auto-docs are at `http://localhost:8000/docs`.
+
+### Startup order (every subsequent run)
+
+```
+1. docker compose up -d     ← database + API
+2. cd frontend && npm run dev  ← frontend
+```
 
 ---
 
@@ -198,11 +198,30 @@ The app will be available at `http://localhost:5173`.
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 5 | PostgreSQL schema, Alembic migrations, Docker Compose setup, reference data seeding (`circuit_config`, `compound_decay_config`) | Complete |
-| 6 | Ingestion pipeline (`run_season.py`), UTS computation engine, SC stop flagging, gap interpolation, strategy classification, SQL aggregate views | Complete |
-| 7 | FastAPI backend — all 8 REST endpoints, Pydantic schemas, error handling, CORS | Complete |
-| 8 | React frontend — race timeline view, pit stop tooltips, team dashboard, circuit analysis | In Progress |
-| 9 | Insights panel, 2023 back-fill, portfolio polish, README demo recording | Planned |
+| 1 | PostgreSQL schema, Alembic migrations, Docker Compose setup, reference data seeding (`circuit_config`, `compound_decay_config`) | Complete |
+| 2 | Ingestion pipeline (`run_season.py`), UTS computation engine, SC stop flagging, gap interpolation, strategy classification, SQL aggregate views | Complete |
+| 3 | FastAPI backend — all 8 REST endpoints, Pydantic schemas, error handling, CORS | Complete |
+| 4 | React frontend core — race timeline view (D3), pit stop tooltips, NavBar, season/race selectors | Complete |
+| 5 | Team Strategy Dashboard, Circuit Analysis view, Insights Panel (static stat cards) | In Progress |
+| 6 | AI-powered insight synthesis — Gemini API integration in Insights Panel, dynamic narrative generated from pre-computed database stats | Planned |
+
+---
+
+## Insights Panel — AI Architecture
+
+The Insights Panel uses a two-layer approach that keeps the AI additive, not load-bearing:
+
+**Layer 1 — Static stat cards** (always rendered, always accurate): raw numbers pulled directly from pre-computed database queries — avg UTS, reactive rate, pit lag index, best/worst stops.
+
+**Layer 2 — AI narrative block** (generated on view load): pre-computed stats are passed as structured JSON to the Gemini API. Gemini synthesises a 2–3 sentence plain-English summary based only on those numbers — it never touches raw F1 data directly.
+
+```
+FastAPI → structured JSON → Gemini API → narrative summary → InsightsPanel
+```
+
+This means the AI layer degrades gracefully: if the API call fails or is slow, the stat cards are still fully useful. The narrative block renders with a clearly labelled *"AI summary · based on computed data"* indicator so the source is always transparent.
+
+**Why this matters for the portfolio:** the chain from notebook findings → pipeline constants → API responses → AI-synthesised UI insights demonstrates that every number Gemini generates traces back to something empirically validated in a Jupyter notebook.
 
 ---
 
@@ -232,6 +251,7 @@ DB_HOST=127.0.0.1
 DB_PORT=5432
 DATABASE_URL=postgresql+pg8000://f1_admin:your_password@127.0.0.1:5432/pit_analyzer_db
 FASTF1_CACHE_DIR=./pipeline/.fastf1_cache
+GEMINI_API_KEY=your_gemini_api_key 
 ```
 
 ---
