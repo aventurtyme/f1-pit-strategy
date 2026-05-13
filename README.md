@@ -235,8 +235,6 @@ The following hypotheses are validated against 2024 season data. Full methodolog
 
 **H3 — Multi-stop proactivity:** Drivers on two-stop strategies have measurably lower reactive stop rates than one-stop drivers.
 
-**H4 — Season-on-season improvement:** UTS trends across 2023–2024 reveal strategic learning patterns in at least two teams.
-
 ---
 
 ## Environment Variables
