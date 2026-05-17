@@ -110,6 +110,15 @@ class DriverStrategyProfile(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Team list  (GET /teams)
+# ---------------------------------------------------------------------------
+
+class TeamList(BaseModel):
+    teams: list[str]        # sorted alphabetically, exact pipeline-written names
+    season: int | None      # echoed back — None means all seasons
+
+
+# ---------------------------------------------------------------------------
 # Team strategy profile  (GET /teams/{team}/strategy-profile)
 # ---------------------------------------------------------------------------
 

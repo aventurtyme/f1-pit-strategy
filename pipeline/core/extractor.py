@@ -157,7 +157,7 @@ def _extract_laps(session: fastf1.core.Session) -> pd.DataFrame:
         )
 
     # Keep only columns we actually use; tolerate optional ones being absent.
-    optional_cols = {"GapToLeader", "IntervalToPositionAhead", "IsPersonalBest", "TrackStatus"}
+    optional_cols = {"GapToLeader", "IntervalToPositionAhead", "IsPersonalBest", "TrackStatus", "Team", "TeamName"}
     keep = required_cols | (optional_cols & set(laps.columns))
     laps = laps[list(keep)].copy()
 

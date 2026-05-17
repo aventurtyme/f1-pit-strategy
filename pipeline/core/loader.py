@@ -174,6 +174,7 @@ async def upsert_pit_stops(
         )
         ON CONFLICT (session_id, driver_code, lap)
         DO UPDATE SET
+            team             = EXCLUDED.team,
             tire_age_self    = EXCLUDED.tire_age_self,
             compound_self    = EXCLUDED.compound_self,
             gap_behind       = EXCLUDED.gap_behind,
@@ -200,7 +201,7 @@ def _build_pit_stop_records(session_id: str, df: pd.DataFrame) -> list[tuple]:
             str(uuid.uuid4()),                          # id
             session_id,                                 # session_id
             str(row.get("driver_code", "")),            # driver_code
-            str(row.get("team") or ""),                 # team
+            _safe_str(row.get("team")),                 # team
             int(row.get("lap", 0)),                     # lap
             _safe_int(row.get("tire_age_self")),        # tire_age_self
             _safe_str(row.get("compound_self")),        # compound_self

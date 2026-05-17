@@ -64,26 +64,18 @@ def build_pit_stop_table(
         logger.warning("No pit stops identified for this session.")
         return pd.DataFrame()
 
-    # Attach pre-pit car state (what pitting driver looked like entering the lap)
     pit_stops = _attach_pre_pit_state(pit_laps, laps)
-
-    # Attach behind-car state at the pit lap
     pit_stops = _attach_behind_state(pit_stops, laps)
-
-    # Attach post-pit position (first clean lap after pit exit)
     pit_stops = _attach_post_pit_position(pit_stops, laps)
 
-    # Flag race conditions
     pit_stops["race_flag"] = pit_stops["lap"].apply(
         lambda lap: _classify_race_flag(lap, sc_laps)
     )
 
-    # Flag tactical stops
     pit_stops["is_tactical"] = (
         pit_stops["lap"] >= (total_laps - TACTICAL_STOP_LAP_CUTOFF)
     )
 
-    # Timing delta: avg lap time delta vs car behind over last 5 laps before pit
     pit_stops["timing_delta"] = _compute_timing_delta(pit_stops, laps)
 
     logger.info(
@@ -104,23 +96,13 @@ def _identify_sc_laps(
     track_status: pd.DataFrame,
     laps: pd.DataFrame,
 ) -> dict[int, str]:
-    """
-    Return a mapping of {lap_number: flag_string} for every lap under SC/VSC.
-    Flag strings: 'sc', 'vsc', 'red'.
-
-    Strategy: for each lap number, check whether any SC/VSC status was active
-    during that lap's time window.  We use LapTime start times from the lead
-    car as a proxy for lap boundaries.
-    """
     sc_laps: dict[int, str] = {}
 
     if track_status.empty:
         return sc_laps
 
-    # FastF1 Status codes
     FLAG_MAP = {"4": "sc", "6": "vsc", "7": "vsc", "5": "red"}
 
-    # Build a simple sorted list of (time, flag) transitions
     transitions = []
     for _, row in track_status.iterrows():
         flag = FLAG_MAP.get(str(row["Status"]))
@@ -134,18 +116,7 @@ def _identify_sc_laps(
 
     transitions.sort(key=lambda x: x[0])
 
-    # Use lead car laps as lap-time reference
-    lead_car_laps = (
-        laps[laps["Position"] == 1]
-        .sort_values("LapNumber")[["LapNumber", "PitOutTime"]]
-        .dropna()
-    )
-
-    # For each lap number, determine which flag was active at the start of that lap
     for lap_num in laps["LapNumber"].unique():
-        lap_rows = laps[laps["LapNumber"] == lap_num]
-        # Use median PitOutTime as lap start proxy (available on pit laps)
-        # Otherwise fall through to track status time-window check
         active_flag = _flag_at_time(transitions, lap_num, laps)
         if active_flag and active_flag != "green":
             sc_laps[lap_num] = active_flag
@@ -158,15 +129,9 @@ def _flag_at_time(
     lap_num: int,
     laps: pd.DataFrame,
 ) -> str:
-    """
-    Determine the active flag at the approximate start of `lap_num`.
-    Falls back to 'green' if no transition data is resolvable.
-    """
     if not transitions:
         return "green"
 
-    # Use TrackStatus column on the laps DataFrame directly if available
-    # (FastF1 annotates each lap row with its track status)
     if "TrackStatus" in laps.columns:
         lap_statuses = laps[laps["LapNumber"] == lap_num]["TrackStatus"].dropna()
         if not lap_statuses.empty:
@@ -180,7 +145,6 @@ def _flag_at_time(
             else:
                 return "green"
 
-    # Fallback: assume green
     return "green"
 
 
@@ -196,11 +160,17 @@ def _identify_pit_laps(laps: pd.DataFrame) -> pd.DataFrame:
     FastF1 sets PitInTime on the lap the driver pits.
 
     Returns a DataFrame with one row per pit event:
-        driver_code, lap, compound_self (compound going INTO pit),
-        tire_age_self (laps on that compound before pitting)
+        driver_code, lap, compound_self, tire_age_self,
+        position_before, team
+
+    FastF1 v3.x uses "Team"; older versions used "TeamName".
+    We detect whichever is present at runtime.
     """
     pit_mask = laps["PitInTime"].notna()
     pit_rows = laps[pit_mask].copy()
+
+    # Detect the correct team column name for this FastF1 version
+    team_col = "Team" if "Team" in pit_rows.columns else "TeamName"
 
     pit_rows = pit_rows.rename(columns={
         "Driver":    "driver_code",
@@ -208,10 +178,10 @@ def _identify_pit_laps(laps: pd.DataFrame) -> pd.DataFrame:
         "Compound":  "compound_self",
         "TyreLife":  "tire_age_self",
         "Position":  "position_before",
-        "Team":      "team",
+        team_col:    "team",
     })
 
-    cols = ["driver_code", "lap", "compound_self", "tire_age_self", 
+    cols = ["driver_code", "lap", "compound_self", "tire_age_self",
             "position_before", "team"]
     available = [c for c in cols if c in pit_rows.columns]
     return pit_rows[available].copy()
@@ -243,13 +213,11 @@ def _attach_pre_pit_state(
         how="left",
     )
 
-    # Use _pos_check only if position_before is missing
     if "position_before" not in pit_stops.columns:
         pit_stops["position_before"] = pit_stops["_pos_check"]
 
     pit_stops.drop(columns=["_pos_check"], errors="ignore", inplace=True)
 
-    # Sanitise gap_behind: clamp jumps that are clearly SC artefacts
     pit_stops["gap_behind"] = pit_stops["gap_behind"].clip(upper=GAP_JUMP_THRESHOLD_SEC * 3)
 
     return pit_stops
@@ -267,7 +235,6 @@ def _attach_behind_state(
     For each pit stop, find who was directly behind the pitting car at that lap
     and attach their compound and tyre life.
     """
-    # Build lookup: (lap, position) → (compound, tyre_life)
     pos_lookup = (
         laps[["LapNumber", "Position", "Compound", "TyreLife", "Driver"]]
         .rename(columns={"Driver": "_behind_driver"})
@@ -288,7 +255,11 @@ def _attach_behind_state(
         ]
         if match.empty:
             return None, None
-        return match.iloc[0]["Compound"], int(match.iloc[0]["TyreLife"])
+        compound = match.iloc[0]["Compound"]
+        tyre     = match.iloc[0]["TyreLife"]
+        # Guard against NaN TyreLife — int() raises ValueError on NaN
+        tire_age = int(tyre) if pd.notna(tyre) else 0
+        return compound, tire_age
 
     behind_data = pit_stops.apply(_get_behind, axis=1, result_type="expand")
     behind_data.columns = ["compound_behind", "tire_age_behind"]
@@ -320,11 +291,10 @@ def _attach_post_pit_position(
         })
     )
 
-    # Match: for each pit stop (driver, pit_lap), find the next outlap
     records = []
     for _, stop in pit_stops.iterrows():
-        driver   = stop["driver_code"]
-        pit_lap  = stop["lap"]
+        driver  = stop["driver_code"]
+        pit_lap = stop["lap"]
         candidate = outlap_lookup[
             (outlap_lookup["driver_code"] == driver) &
             (outlap_lookup["outlap"]      >= pit_lap)
@@ -332,10 +302,11 @@ def _attach_post_pit_position(
         if candidate.empty:
             records.append({"driver_code": driver, "lap": pit_lap, "position_after": np.nan})
         else:
+            pos = candidate.iloc[0]["position_after"]
             records.append({
-                "driver_code":   driver,
-                "lap":           pit_lap,
-                "position_after": candidate.iloc[0]["position_after"],
+                "driver_code":    driver,
+                "lap":            pit_lap,
+                "position_after": float(pos) if pd.notna(pos) else np.nan,
             })
 
     pos_after_df = pd.DataFrame(records)
@@ -387,10 +358,9 @@ def _compute_timing_delta(
             (lap_times["LapNumber"].isin(window_laps))
         ]["LapTimeSec"].dropna()
 
-        # Identify who was behind at pit_lap using position
         pos_before = stop.get("position_before")
         behind_driver = None
-        if not pd.isna(pos_before):
+        if pd.notna(pos_before):
             behind_pos = int(pos_before) + 1
             match = laps[
                 (laps["LapNumber"] == pit_lap) &
@@ -410,7 +380,6 @@ def _compute_timing_delta(
         if own_times.empty or behind_times.empty:
             deltas.append(0.0)
         else:
-            delta = float(own_times.mean() - behind_times.mean())
-            deltas.append(delta)
+            deltas.append(float(own_times.mean() - behind_times.mean()))
 
     return pd.Series(deltas, index=pit_stops.index)
