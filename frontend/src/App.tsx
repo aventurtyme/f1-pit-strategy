@@ -1,27 +1,24 @@
 // ─────────────────────────────────────────────────────────
 // App.tsx
-// Root layout: NavBar (sticky) + routed content area.
-// Phase 5 routes (Teams, Circuits, Insights) are stubbed
-// with placeholder pages so NavBar links are functional.
+// Root layout: sticky NavBar + routed content area.
+// Phase 5 views are now live — no more stubs.
+//
+// Route structure (matches layout_proposal.html tab names):
+//   /             → TimelineView
+//   /teams        → TeamsView   (self-contained season + team selector)
+//   /circuits     → CircuitsView (self-contained season + circuit list)
+//   /insights     → InsightsView
+//   *             → NotFound
 // ─────────────────────────────────────────────────────────
 
 import { Routes, Route } from 'react-router-dom'
-import { TeamView }    from './views/TeamView'
-import { CircuitView } from './views/CircuitView'
-import { InsightsPanel } from './components/insights/InsightsPanel'
 import NavBar from './components/NavBar'
 import TimelineView from './views/TimelineView'
+import { TeamsView }    from './views/TeamsView'
+import { CircuitsView } from './views/CircuitsView'
+import { InsightsView } from './views/InsightsView'
 import NotFound from './views/NotFound'
 import styles from './App.module.css'
-
-// ── Phase 5 stubs — replaced in next phase ───────────────
-function ComingSoon({ name }: { name: string }) {
-  return (
-    <div className={styles.comingSoon}>
-      <p>{name} view — Phase 5</p>
-    </div>
-  )
-}
 
 export default function App() {
   return (
@@ -29,11 +26,11 @@ export default function App() {
       <NavBar />
       <main className={styles.main}>
         <Routes>
-          <Route path="/"                      element={<TimelineView />} />
-          <Route path="/teams/:team"           element={<TeamView />} />
-          <Route path="/circuits/:circuitKey"  element={<CircuitView />} />
-          <Route path="/insights"              element={<InsightsPanel />} />
-          <Route path="*"                      element={<NotFound />} />
+          <Route path="/"          element={<TimelineView />} />
+          <Route path="/teams"     element={<TeamsView />} />
+          <Route path="/circuits"  element={<CircuitsView />} />
+          <Route path="/insights"  element={<InsightsView />} />
+          <Route path="*"          element={<NotFound />} />
         </Routes>
       </main>
     </div>

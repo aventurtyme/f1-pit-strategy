@@ -1,3 +1,9 @@
+// ─────────────────────────────────────────────────────────
+// api/queries.ts
+// React Query hooks. All types match the actual FastAPI
+// response shapes defined in types.ts.
+// ─────────────────────────────────────────────────────────
+
 import { useQuery } from 'react-query'
 import client from './client'
 import type {
@@ -5,49 +11,31 @@ import type {
   Race,
   PitStopDetail,
   RaceTimeline,
+  TeamList,
   TeamStrategyProfile,
   CircuitAnalysis,
+  UndercutRanking,
 } from './types'
 
 // ── Query keys ────────────────────────────────────────────
 
 export const queryKeys = {
-  seasons:  ['seasons'] as const,
-  races:    (season: number)    => ['races', season] as const,
-  pitStops: (sessionId: string) => ['pit-stops', sessionId] as const,
-  timeline: (sessionId: string) => ['timeline', sessionId] as const,
+  seasons:         ['seasons'] as const,
+  races:           (season: number)      => ['races', season] as const,
+  pitStops:        (sessionId: string)   => ['pit-stops', sessionId] as const,
+  timeline:        (sessionId: string)   => ['timeline', sessionId] as const,
+  teams:           (season?: number)     => ['teams', season ?? 'all'] as const,
+  teamProfile:     (team: string, season?: number) => ['team-profile', team, season ?? 'all'] as const,
+  circuitAnalysis: (key: string, season?: number)  => ['circuit-analysis', key, season ?? 'all'] as const,
+  insights:        (season?: number, limit?: number) => ['insights', season ?? 'all', limit ?? 10] as const,
 }
 
-// ── Fetchers ──────────────────────────────────────────────
-
-async function fetchSeasons(): Promise<Season[]> {
-  const { data } = await client.get<Season[]>('/seasons')
-  return data
-}
-
-async function fetchRaces(season: number): Promise<Race[]> {
-  const { data } = await client.get<Race[]>(`/seasons/${season}/races`)
-  return data
-}
-
-async function fetchPitStops(sessionId: string): Promise<PitStopDetail[]> {
-  const { data } = await client.get<PitStopDetail[]>(
-    `/races/${sessionId}/pit-stops?exclude_sc=false`
-  )
-  return data
-}
-
-async function fetchTimeline(sessionId: string): Promise<RaceTimeline> {
-  const { data } = await client.get<RaceTimeline>(`/races/${sessionId}/timeline`)
-  return data
-}
-
-// ── Hooks — existing (v3 positional syntax) ───────────────
+// ── Hooks — seasons + races ───────────────────────────────
 
 export function useSeasons() {
   return useQuery(
     queryKeys.seasons,
-    fetchSeasons,
+    () => client.get<Season[]>('/seasons').then(r => r.data),
     { staleTime: Infinity }
   )
 }
@@ -55,15 +43,22 @@ export function useSeasons() {
 export function useRaces(season: number | null) {
   return useQuery(
     queryKeys.races(season ?? 0),
-    () => fetchRaces(season!),
+    () => client.get<Race[]>(`/seasons/${season}/races`).then(r => r.data),
     { enabled: season !== null, staleTime: Infinity }
   )
 }
 
-export function usePitStops(sessionId: string | null) {
+// ── Hooks — race detail ───────────────────────────────────
+
+export function usePitStops(sessionId: string | null, excludeSc = false) {
   return useQuery(
     queryKeys.pitStops(sessionId ?? ''),
-    () => fetchPitStops(sessionId!),
+    () =>
+      client
+        .get<PitStopDetail[]>(`/races/${sessionId}/pit-stops`, {
+          params: { exclude_sc: excludeSc },
+        })
+        .then(r => r.data),
     { enabled: sessionId !== null, staleTime: 5 * 60 * 1000 }
   )
 }
@@ -71,45 +66,80 @@ export function usePitStops(sessionId: string | null) {
 export function useTimeline(sessionId: string | null) {
   return useQuery(
     queryKeys.timeline(sessionId ?? ''),
-    () => fetchTimeline(sessionId!),
+    () => client.get<RaceTimeline>(`/races/${sessionId}/timeline`).then(r => r.data),
     { enabled: sessionId !== null, staleTime: 5 * 60 * 1000 }
   )
 }
 
-// ── Hooks — phase 5 ───────────────────────────────────────
+// ── Hooks — teams ─────────────────────────────────────────
 
-export function useTeamProfile(team: string, season: number) {
+/**
+ * Distinct team names for a season (or all seasons).
+ * Used to populate the team selector in TeamsView.
+ */
+export function useTeams(season?: number) {
   return useQuery(
-    ['team-profile', team, season],
+    queryKeys.teams(season),
     () =>
       client
-        .get<TeamStrategyProfile>(`/teams/${encodeURIComponent(team)}/strategy-profile`, {
-          params: { season },
-        })
+        .get<TeamList>('/teams', { params: season ? { season } : {} })
         .then(r => r.data),
-    { enabled: !!team && !!season }
+    { staleTime: Infinity }
   )
 }
 
-export function useCircuitAnalysis(circuitKey: string) {
+/**
+ * Full strategy profile for a team.
+ * season is optional — omit to get all seasons combined.
+ * The response always contains a `seasons` array.
+ */
+export function useTeamProfile(team: string, season?: number) {
   return useQuery(
-    ['circuit-analysis', circuitKey],
+    queryKeys.teamProfile(team, season),
     () =>
       client
-        .get<CircuitAnalysis>(`/circuits/${circuitKey}/analysis`)
+        .get<TeamStrategyProfile>(`/teams/${encodeURIComponent(team)}/strategy-profile`, {
+          params: season ? { season } : {},
+        })
+        .then(r => r.data),
+    { enabled: !!team }
+  )
+}
+
+// ── Hooks — circuits ──────────────────────────────────────
+
+/**
+ * Circuit-level UTS patterns.
+ * season is optional — omit to aggregate across all computed seasons.
+ */
+export function useCircuitAnalysis(circuitKey: string, season?: number) {
+  return useQuery(
+    queryKeys.circuitAnalysis(circuitKey, season),
+    () =>
+      client
+        .get<CircuitAnalysis>(`/circuits/${circuitKey}/analysis`, {
+          params: season ? { season } : {},
+        })
         .then(r => r.data),
     { enabled: !!circuitKey }
   )
 }
 
-export function useInsights() {
+// ── Hooks — insights ──────────────────────────────────────
+
+/**
+ * Best and worst UTS stops across all seasons (or one season).
+ * Returns { best: RankedStop[], worst: RankedStop[] }.
+ */
+export function useInsights(season?: number, limit = 10) {
   return useQuery(
-    ['insights'],
+    queryKeys.insights(season, limit),
     () =>
       client
-        .get<{ findings: { id: string; text: string; polarity: 'positive' | 'negative' | 'neutral' }[] }>(
-          '/insights/undercut-ranking'
-        )
-        .then(r => r.data)
+        .get<UndercutRanking>('/insights/undercut-ranking', {
+          params: { limit, ...(season ? { season } : {}) },
+        })
+        .then(r => r.data),
+    { staleTime: 5 * 60 * 1000 }
   )
 }

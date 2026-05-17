@@ -29,7 +29,7 @@ export interface Race {
 export type StrategyType = 'proactive' | 'reactive' | 'neutral'
 export type RaceFlag     = 'green' | 'yellow' | 'sc' | 'vsc' | 'red'
 
-// ── GET /races/{session_id}/pit-stops ────────────────────
+// ── GET /races/{session_id}/pit-stops ─────────────────────
 // Full detail — includes all UTS inputs
 
 export interface PitStopDetail {
@@ -40,7 +40,7 @@ export interface PitStopDetail {
   lap: number
   tire_age_self: number
   compound_self: string
-  gap_behind: number
+  gap_behind: number | null
   tire_age_behind: number
   compound_behind: string
   ptl: number | null
@@ -54,7 +54,6 @@ export interface PitStopDetail {
 
 // ── GET /races/{session_id}/timeline ─────────────────────
 // Lightweight — only fields needed for D3 rendering.
-// Full detail lives in /pit-stops; TimelineView merges both.
 
 export interface TimelinePitEvent {
   id: string
@@ -81,12 +80,8 @@ export interface RaceTimeline {
 }
 
 // ── Derived: pit event merged with full detail ────────────
-// Concrete interface — avoids TypeScript spread inference issues.
-// Required fields are always present (from /timeline).
-// Optional fields appear after /pit-stops resolves and merges in.
 
 export interface MergedPitStop {
-  // Always present (from TimelinePitEvent)
   id: string
   driver_code: string
   team: string
@@ -100,7 +95,6 @@ export interface MergedPitStop {
   race_flag: RaceFlag
   is_opportunistic: boolean
 
-  // Present after /pit-stops merges in
   session_id?: string
   tire_age_self?: number
   tire_age_behind?: number
@@ -109,7 +103,6 @@ export interface MergedPitStop {
 }
 
 // ── Derived: drivers grouped from flat pit_events ─────────
-// Built client-side from RaceTimeline for the D3 component
 
 export interface DriverRow {
   driver_code: string
@@ -117,40 +110,62 @@ export interface DriverRow {
   pit_stops: MergedPitStop[]
 }
 
-// ── Team profile ──────────────────────────────────────
-export interface TeamRaceUts {
-  session_id: string;
-  circuit_name: string;
-  round: number;
-  avg_uts: number;
-  stop_count: number;
+// ── GET /teams ────────────────────────────────────────────
+
+export interface TeamList {
+  teams: string[]
+  season: number | null
+}
+
+// ── GET /teams/{team}/strategy-profile ───────────────────
+// Season is an optional query param; response always contains
+// a `seasons` array (one entry per season with data).
+
+export interface TeamSeasonStats {
+  season: number
+  avg_uts: number | null
+  reactive_stop_rate: number   // 0–100 (percentage, not fraction)
+  total_green_stops: number
+  proactive_stops: number
+  reactive_stops: number
+  neutral_stops: number
+  opportunistic_stops: number
 }
 
 export interface TeamStrategyProfile {
-  team: string;
-  season: number;
-  avg_uts: number;
-  reactive_stop_rate: number;    // 0–1
-  proactive_stop_rate: number;
-  neutral_stop_rate: number;
-  pit_lag_index: number;         // median laps late
-  stops_analysed: number;
-  race_uts: TeamRaceUts[];       // per-race breakdown for bar chart
-  best_stops: PitStopDetail[];         // top 3 by UTS
-  worst_stops: PitStopDetail[];        // bottom 3 by UTS
+  team: string
+  seasons: TeamSeasonStats[]
+  best_stop: PitStopDetail | null
+  worst_stop: PitStopDetail | null
 }
 
-// ── Circuit analysis ──────────────────────────────────
+// ── GET /circuits/{circuit_key}/analysis ─────────────────
+
 export interface CircuitAnalysis {
-  circuit_key: string;
-  circuit_name: string;
-  circuit_type: 'street' | 'permanent' | 'hybrid';
-  pit_loss_estimate: number;
-  avg_gap_behind: number;
-  avg_uts: number;
-  negative_uts_rate: number;     // 0–1
-  late_call_position_correlation: number;   // −1 to +1
-  circuit_punishment_score: number;
-  uts_distribution: { bucket: string; count: number }[];
-  stops_analysed: number;
+  circuit_key: string
+  circuit_name: string | null
+  circuit_type: 'street' | 'permanent' | 'hybrid' | null
+  pit_loss_estimate: number | null
+  sc_loss_factor: number | null
+  total_green_stops: number
+  total_sc_stops: number
+  avg_uts: number | null
+  negative_uts_pct: number      // 0–100 (percentage of stops below midpoint)
+  avg_gap_behind_at_pit: number | null
+  avg_ppd: number | null
+}
+
+// ── GET /insights/undercut-ranking ───────────────────────
+
+export interface RankedStop {
+  rank: number
+  stop: PitStopDetail
+  circuit_name: string
+  season: number
+  round: number
+}
+
+export interface UndercutRanking {
+  best: RankedStop[]
+  worst: RankedStop[]
 }
