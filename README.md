@@ -202,7 +202,7 @@ The app will be available at `http://localhost:5173`. The API auto-docs are at `
 | 2 | Ingestion pipeline (`run_season.py`), UTS computation engine, SC stop flagging, gap interpolation, strategy classification, SQL aggregate views | Complete |
 | 3 | FastAPI backend — all 8 REST endpoints, Pydantic schemas, error handling, CORS | Complete |
 | 4 | React frontend core — race timeline view (D3), pit stop tooltips, NavBar, season/race selectors | Complete |
-| 5 | Team Strategy Dashboard, Circuit Analysis view, Insights Panel (static stat cards) | In Progress |
+| 5 | Team Strategy Dashboard, Circuit Analysis view, Insights Panel (static stat cards) | Complete |
 | 6 | AI-powered insight synthesis — Gemini API integration in Insights Panel, dynamic narrative generated from pre-computed database stats | Planned |
 
 ---
