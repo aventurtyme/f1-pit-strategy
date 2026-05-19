@@ -118,10 +118,23 @@ UTS_WEIGHTS = UTSWeights()
 PTL_MAX: float = 20.0   # seconds — clips extreme outliers
 PPD_MAX: float = 10.0   # positions
 
-# Timing normaliser — notebook §3.6 clips timing_delta / 8.0
-# (increased from PRD's 5-lap window to reduce optimism bias)
-TIMING_NORMALISER_LAPS: float = 8.0
-TIMING_PENALTY_CAP:     float = 0.5   # max contribution before weighting
+# Timing normaliser — clips timing_delta (seconds/lap pace delta) to 0→1.
+#
+# timing_delta is computed by _compute_timing_delta() as:
+#   mean(own lap times over last 5 laps) - mean(car-behind lap times)
+# i.e. it is a pace delta in SECONDS per lap, not a lap count.
+#
+# A delta of 2.0 s/lap is extreme (e.g. a car on 30-lap-old softs vs fresh
+# mediums); 1.0 s/lap is a strong threat.  Normalising by 8.0 (the old
+# "laps" figure) meant timing_delta / 8.0 was almost always < 0.1, so
+# timing_clean ≈ 1.0 for every stop and the 20.95% timing weight contributed
+# near-zero variance — same dead-weight pattern as the PPD bug.
+#
+# Fix: use 2.0 s as the saturation point.  A 2 s/lap pace deficit maps to
+# timing_clean = 0.0 (worst possible timing penalty); 0 s/lap maps to 1.0.
+# Source: §3.6 intent confirmed in 03_metric_validation.ipynb comments.
+TIMING_NORMALISER_SEC: float = 2.0    # seconds/lap at which penalty saturates
+TIMING_PENALTY_CAP:    float = 0.5    # max contribution before weighting
 
 # ---------------------------------------------------------------------------
 # UTS output scale

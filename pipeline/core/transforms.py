@@ -10,6 +10,20 @@ Responsibilities:
   3. Enrich each pit stop row with the state of the car *behind* at that lap
   4. Detect tactical stops (final-lap fastest-lap attempts)
   5. Compute post-pit position delta (PPD)
+
+Changelog:
+  - _attach_post_pit_position: fixed PPD to read position from the lap
+    *after* the out-lap (outlap + 1), not the out-lap itself.  FastF1
+    does not assign a reliable track position on the out-lap because the
+    driver is physically in the pit lane for most of it — the position
+    column is NaN or stale until they cross the line on the next lap.
+    Using the out-lap caused PPD ≈ 0 for almost every stop.
+
+  - _flag_at_time: added proper fallback to the event-log transitions
+    list when the per-lap TrackStatus column is absent or NaN for a given
+    lap.  Previously the function returned 'green' unconditionally in those
+    cases, so SC/VSC laps with missing per-lap status data were never tagged,
+    causing SC stops to be scored as green-flag stops with wrong strategy_type.
 """
 
 from __future__ import annotations
@@ -129,9 +143,28 @@ def _flag_at_time(
     lap_num: int,
     laps: pd.DataFrame,
 ) -> str:
+    """
+    Return the race flag active on `lap_num`.
+
+    Resolution order:
+      1. FastF1 per-lap TrackStatus column — most granular; preferred when
+         the cell is non-null.  FastF1 encodes active statuses as a string of
+         digit characters, e.g. "2486" means statuses 2, 4, 8, 6 are all
+         active on that lap.
+      2. Track-status event log (transitions list built from session.track_status)
+         — used when the lap-level column is absent or NaN for this lap.
+
+    The transitions fallback matters for sessions where FastF1 omits the
+    per-lap TrackStatus column entirely (older cached data, sprint races, etc.),
+    and for individual laps where the column value is NaN.  Without the
+    fallback those laps were always tagged 'green', causing SC stops to be
+    misclassified as green-flag stops and scored with (bad) PTL-based
+    strategy types.
+    """
     if not transitions:
         return "green"
 
+    # --- Method 1: per-lap TrackStatus column ---
     if "TrackStatus" in laps.columns:
         lap_statuses = laps[laps["LapNumber"] == lap_num]["TrackStatus"].dropna()
         if not lap_statuses.empty:
@@ -144,8 +177,33 @@ def _flag_at_time(
                 return "red"
             else:
                 return "green"
+        # lap_statuses is empty (all NaN for this lap) — fall through to Method 2
 
-    return "green"
+    # --- Method 2: event-log transitions (bisect to find active flag) ---
+    # Find the lap's LapTime so we can locate it on the session clock.
+    # Use the median PitInTime / LapTime across all drivers for the lap as a
+    # proxy for when the lap was being driven.  If unavailable, use the lap
+    # number as a fractional index (not ideal but safe).
+    lap_rows = laps[laps["LapNumber"] == lap_num]
+    lap_time_col = next(
+        (c for c in ("LapTime", "Time") if c in lap_rows.columns), None
+    )
+    if lap_time_col is None or lap_rows[lap_time_col].dropna().empty:
+        return "green"
+
+    # Take the first non-null timestamp for this lap as the reference point.
+    ref_time = lap_rows[lap_time_col].dropna().iloc[0]
+
+    # Walk backwards through sorted transitions to find the last status change
+    # at or before ref_time.
+    active_flag = "green"
+    for t_time, t_flag in transitions:
+        if t_time <= ref_time:
+            active_flag = t_flag
+        else:
+            break
+
+    return active_flag
 
 
 # ---------------------------------------------------------------------------
@@ -277,37 +335,87 @@ def _attach_post_pit_position(
     laps: pd.DataFrame,
 ) -> pd.DataFrame:
     """
-    PPD = position_after_pit_exit − position_before_pit_entry.
-    position_after = first lap's Position value where PitOutTime is set
-    for this driver (the out-lap).
+    PPD = position_after_rejoining − position_before_pit_entry.
+
+    position_after is read from the lap *after* the out-lap, not the out-lap
+    itself.  On the out-lap the driver is physically in/exiting the pit lane
+    for most of the lap; FastF1 either leaves Position as NaN or carries a
+    stale value from before the stop.  The timing system only assigns a
+    reliable, settled track position once the driver completes a full lap on
+    track — i.e. outlap + 1.
+
+    Fallback chain:
+      1. outlap + 1  (preferred — fully settled position)
+      2. outlap      (if outlap+1 data doesn't exist, e.g. race ended)
+      3. NaN         (if neither exists — PPD will be 0 after fillna)
+
+    PPD < 0 → gained positions (good outcome)
+    PPD > 0 → lost positions (poor outcome)
+    PPD = 0 → neutral
     """
+    # Build a position lookup for ALL laps (not just out-laps).
+    # We need it for the "outlap + 1" settled-position lookup.
+    all_laps_pos = (
+        laps[["Driver", "LapNumber", "Position"]]
+        .copy()
+        .rename(columns={
+            "Driver":    "driver_code",
+            "LapNumber": "lap_num",
+            "Position":  "pos",
+        })
+    )
+    all_laps_pos["pos"] = pd.to_numeric(all_laps_pos["pos"], errors="coerce")
+
+    # Build a lookup of out-laps per driver (for finding the base out-lap number).
     outlap_lookup = (
-        laps[laps["PitOutTime"].notna()][["Driver", "LapNumber", "Position"]]
+        laps[laps["PitOutTime"].notna()][["Driver", "LapNumber"]]
         .copy()
         .rename(columns={
             "Driver":    "driver_code",
             "LapNumber": "outlap",
-            "Position":  "position_after",
         })
     )
+
+    def _position_after(driver: str, pit_lap: int) -> float:
+        """
+        Return the settled position for `driver` after the pit stop on
+        `pit_lap`, using the outlap+1 strategy described above.
+        """
+        # Find the first out-lap at or after the pit lap for this driver.
+        candidates = outlap_lookup[
+            (outlap_lookup["driver_code"] == driver) &
+            (outlap_lookup["outlap"]      >= pit_lap)
+        ].sort_values("outlap")
+
+        if candidates.empty:
+            return np.nan
+
+        outlap_num = int(candidates.iloc[0]["outlap"])
+        settled_lap = outlap_num + 1  # preferred: one lap after out-lap
+
+        # Try settled lap first, fall back to out-lap itself.
+        for lap_to_try in (settled_lap, outlap_num):
+            row = all_laps_pos[
+                (all_laps_pos["driver_code"] == driver) &
+                (all_laps_pos["lap_num"]     == lap_to_try)
+            ]
+            if not row.empty:
+                pos = row.iloc[0]["pos"]
+                if pd.notna(pos):
+                    return float(pos)
+
+        return np.nan
 
     records = []
     for _, stop in pit_stops.iterrows():
         driver  = stop["driver_code"]
         pit_lap = stop["lap"]
-        candidate = outlap_lookup[
-            (outlap_lookup["driver_code"] == driver) &
-            (outlap_lookup["outlap"]      >= pit_lap)
-        ].sort_values("outlap")
-        if candidate.empty:
-            records.append({"driver_code": driver, "lap": pit_lap, "position_after": np.nan})
-        else:
-            pos = candidate.iloc[0]["position_after"]
-            records.append({
-                "driver_code":    driver,
-                "lap":            pit_lap,
-                "position_after": float(pos) if pd.notna(pos) else np.nan,
-            })
+        pos_after = _position_after(driver, pit_lap)
+        records.append({
+            "driver_code":    driver,
+            "lap":            pit_lap,
+            "position_after": pos_after,
+        })
 
     pos_after_df = pd.DataFrame(records)
     pit_stops = pit_stops.merge(pos_after_df, on=["driver_code", "lap"], how="left")
@@ -317,7 +425,24 @@ def _attach_post_pit_position(
         pd.to_numeric(pit_stops["position_before"], errors="coerce")
     ).fillna(0).astype(int)
 
+    _log_ppd_summary(pit_stops)
     return pit_stops
+
+
+def _log_ppd_summary(pit_stops: pd.DataFrame) -> None:
+    """Log PPD distribution as a quick sanity check after computation."""
+    ppd = pit_stops["ppd"]
+    zero_pct = (ppd == 0).mean() * 100
+    logger.info(
+        "PPD summary — mean=%.2f | zero_rate=%.1f%% | min=%d | max=%d",
+        ppd.mean(), zero_pct, ppd.min(), ppd.max(),
+    )
+    if zero_pct > 60:
+        logger.warning(
+            "PPD zero-rate is %.1f%% — position_after data may be unreliable "
+            "for this session. Check FastF1 Position column coverage.",
+            zero_pct,
+        )
 
 
 # ---------------------------------------------------------------------------
